@@ -165,6 +165,9 @@ exports.updateTask = async (req, res, next) => {
       sanitizedBody[key] = sanitize(value);
     }
     
+    // Always update the updatedAt field
+    sanitizedBody.updatedAt = Date.now();
+    
     let task = await Task.findById(taskId);
     
     if (!task) {

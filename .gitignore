@@ -6,7 +6,7 @@ package-lock.json
 .env
 
 # Logs
-logs/
+src/logs/
 *.log
 npm-debug.log*
 

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, getMe, refreshToken } = require('../controllers/auth');
+const { register, login, getMe, refreshToken, logout } = require('../controllers/auth');
 const { protect } = require('../middleware/auth');
 
 /**
@@ -103,6 +103,24 @@ router.post('/login', login);
  *         description: Server error
  */
 router.post('/refresh-token', refreshToken);
+
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Logout user and invalidate refresh token
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully logged out
+ *       401:
+ *         description: Not authorized
+ *       500:
+ *         description: Server error
+ */
+router.post('/logout', protect, logout);
 
 /**
  * @swagger

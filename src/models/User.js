@@ -29,6 +29,10 @@ const UserSchema = new mongoose.Schema({
     type: String,
     select: false
   },
+  refreshTokenExpire: {
+    type: Date,
+    select: false
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -65,6 +69,9 @@ UserSchema.methods.getSignedRefreshToken = function() {
     .createHash('sha256')
     .update(refreshToken)
     .digest('hex');
+  
+  // Set token expiry (longer than access token, e.g., 7 days)
+  this.refreshTokenExpire = Date.now() + 7 * 24 * 60 * 60 * 1000;
   
   return refreshToken;
 };

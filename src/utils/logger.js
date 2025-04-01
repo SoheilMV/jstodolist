@@ -1,5 +1,12 @@
 const winston = require('winston');
 const path = require('path');
+const fs = require('fs');
+
+// Ensure logs directory exists
+const logsDir = path.join(__dirname, '..', 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
 
 // Define log format
 const logFormat = winston.format.combine(
@@ -19,12 +26,12 @@ const consoleTransport = new winston.transports.Console({
 
 // Create file transports
 const errorLogTransport = new winston.transports.File({
-  filename: path.join('logs', 'error.log'),
+  filename: path.join(logsDir, 'error.log'),
   level: 'error'
 });
 
 const combinedLogTransport = new winston.transports.File({
-  filename: path.join('logs', 'combined.log')
+  filename: path.join(logsDir, 'combined.log')
 });
 
 // Create logger

@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Joi = require('joi');
 const { ErrorResponse } = require('../middleware/error');
 const sanitize = require('mongo-sanitize');
+const crypto = require('crypto');
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -118,38 +119,74 @@ exports.refreshToken = async (req, res, next) => {
       return next(new ErrorResponse('No refresh token provided', 400));
     }
 
-    // Verify refresh token
-    const user = await User.findOne({ refreshToken });
+    // Hash the provided token to check against the database
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
+
+    // Find user with the hashed refresh token and include the expiration field
+    const user = await User.findOne({ 
+      refreshToken: hashedToken,
+      refreshTokenExpire: { $gt: Date.now() }
+    }).select('+refreshToken +refreshTokenExpire');
+    
     if (!user) {
-      return next(new ErrorResponse('Invalid refresh token', 401));
+      return next(new ErrorResponse('Invalid or expired refresh token', 401));
     }
 
     // Generate new tokens
-    sendTokenResponse(user, 200, res);
+    await sendTokenResponse(user, 200, res);
   } catch (err) {
     next(err);
   }
 };
 
 // Helper function to get token and send response
-const sendTokenResponse = (user, statusCode, res) => {
-  // Create token
-  const token = user.getSignedJwtToken();
-  
-  // Create refresh token
-  const refreshToken = user.getSignedRefreshToken();
-  
-  // Save refresh token to user
-  User.findByIdAndUpdate(user._id, { refreshToken }, { new: true }).exec();
+const sendTokenResponse = async (user, statusCode, res) => {
+  try {
+    // Create token
+    const token = user.getSignedJwtToken();
+    
+    // Create refresh token
+    const refreshToken = user.getSignedRefreshToken();
+    
+    // Save refresh token to user
+    await User.findByIdAndUpdate(user._id, { refreshToken: user.refreshToken }, { new: true });
 
-  res.status(statusCode).json({
-    success: true,
-    token,
-    refreshToken,
-    user: {
-      id: user._id,
-      name: user.name,
-      email: user.email
-    }
-  });
+    res.status(statusCode).json({
+      success: true,
+      token,
+      refreshToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email
+      }
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Error generating authentication tokens'
+    });
+  }
+};
+
+// @desc    Logout user / clear refresh token
+// @route   POST /api/auth/logout
+// @access  Private
+exports.logout = async (req, res, next) => {
+  try {
+    await User.findByIdAndUpdate(req.user.id, { 
+      refreshToken: null,
+      refreshTokenExpire: null
+    });
+    
+    res.status(200).json({
+      success: true,
+      data: {}
+    });
+  } catch (err) {
+    next(err);
+  }
 }; 

@@ -3,13 +3,14 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const morgan = require('morgan');
+const path = require('path');
 const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUI = require('swagger-ui-express');
 const { errorHandler } = require('./middleware/error');
 const logger = require('./utils/logger');
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from the root directory
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -40,7 +41,7 @@ const swaggerOptions = {
       },
     ],
   },
-  apis: ['./routes/*.js'],
+  apis: [path.join(__dirname, './routes/*.js')],
 };
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
