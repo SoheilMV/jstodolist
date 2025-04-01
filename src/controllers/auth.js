@@ -154,6 +154,29 @@ const sendTokenResponse = async (user, statusCode, res) => {
     // Save refresh token to user
     await User.findByIdAndUpdate(user._id, { refreshToken: user.refreshToken }, { new: true });
 
+    // Cookie options
+    const cookieOptions = {
+      httpOnly: true,
+      // Expires in 30 days (or whatever JWT_EXPIRE is set to)
+      expires: new Date(
+        Date.now() + process.env.JWT_COOKIE_EXPIRE * 24 * 60 * 60 * 1000 || 30 * 24 * 60 * 60 * 1000
+      )
+    };
+
+    // Set secure flag in production
+    if (process.env.NODE_ENV === 'production') {
+      cookieOptions.secure = true;
+      cookieOptions.sameSite = 'strict';
+    }
+
+    // Set cookies
+    res.cookie('token', token, cookieOptions);
+    res.cookie('refreshToken', refreshToken, {
+      ...cookieOptions,
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days for refresh token
+    });
+
+    // Return user details and tokens (tokens still returned for clients that don't use cookies)
     res.status(statusCode).json({
       success: true,
       token,
@@ -180,6 +203,17 @@ exports.logout = async (req, res, next) => {
     await User.findByIdAndUpdate(req.user.id, { 
       refreshToken: null,
       refreshTokenExpire: null
+    });
+    
+    // Clear cookies
+    res.cookie('token', 'none', {
+      httpOnly: true,
+      expires: new Date(Date.now() + 10 * 1000) // Expires in 10 seconds
+    });
+    
+    res.cookie('refreshToken', 'none', {
+      httpOnly: true,
+      expires: new Date(Date.now() + 10 * 1000)
     });
     
     res.status(200).json({
