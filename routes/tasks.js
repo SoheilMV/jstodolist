@@ -100,6 +100,18 @@ router.use(protect);
  *           enum: [asc, desc]
  *           default: asc
  *         description: Sort direction
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of items per page
  *     responses:
  *       200:
  *         description: List of tasks
@@ -110,6 +122,21 @@ router.use(protect);
  *               properties:
  *                 success:
  *                   type: boolean
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                       description: Total number of tasks
+ *                     page:
+ *                       type: integer
+ *                       description: Current page number
+ *                     limit:
+ *                       type: integer
+ *                       description: Number of items per page
+ *                     totalPages:
+ *                       type: integer
+ *                       description: Total number of pages
  *                 count:
  *                   type: number
  *                 data:

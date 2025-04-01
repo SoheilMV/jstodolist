@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, getMe } = require('../controllers/auth');
+const { register, login, getMe, refreshToken } = require('../controllers/auth');
 const { protect } = require('../middleware/auth');
 
 /**
@@ -76,6 +76,33 @@ router.post('/register', register);
  *         description: Server error
  */
 router.post('/login', login);
+
+/**
+ * @swagger
+ * /api/auth/refresh-token:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: New tokens generated successfully
+ *       401:
+ *         description: Invalid refresh token
+ *       500:
+ *         description: Server error
+ */
+router.post('/refresh-token', refreshToken);
 
 /**
  * @swagger

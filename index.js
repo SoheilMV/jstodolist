@@ -5,6 +5,8 @@ const dotenv = require('dotenv');
 const morgan = require('morgan');
 const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUI = require('swagger-ui-express');
+const { errorHandler } = require('./middleware/error');
+const logger = require('./utils/logger');
 
 // Load environment variables
 dotenv.config();
@@ -53,16 +55,29 @@ app.get('/', (req, res) => {
   res.send('Welcome to Todo List API. Visit /api-docs for documentation.');
 });
 
+// Error handler middleware (should be after routes)
+app.use(errorHandler);
+
+// Validate required environment variables
+const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET', 'JWT_EXPIRE'];
+const missingEnvVars = requiredEnvVars.filter(env => !process.env[env]);
+
+if (missingEnvVars.length > 0) {
+  logger.error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
+  process.exit(1);
+}
+
 // Connect to MongoDB
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
-    console.log('Connected to MongoDB');
+    logger.info('Connected to MongoDB');
     // Start the server
     app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+      logger.info(`Server running on port ${PORT}`);
     });
   })
   .catch(err => {
-    console.error('Could not connect to MongoDB...', err);
+    logger.error(`Could not connect to MongoDB: ${err.message}`);
+    process.exit(1);
   }); 

@@ -1,13 +1,27 @@
 const Task = require('../models/Task');
 const Joi = require('joi');
+const { ErrorResponse } = require('../middleware/error');
+const sanitize = require('mongo-sanitize');
 
 // @desc    Get all tasks for a user
 // @route   GET /api/tasks
 // @access  Private
-exports.getTasks = async (req, res) => {
+exports.getTasks = async (req, res, next) => {
   try {
-    // Parse query parameters for filtering and sorting
-    const { completed, priority, sort, sortDir = 'asc' } = req.query;
+    // Parse query parameters for filtering, sorting and pagination
+    const { 
+      completed, 
+      priority, 
+      sort, 
+      sortDir = 'asc',
+      page = 1,
+      limit = 10
+    } = req.query;
+    
+    // Sanitize and parse pagination params
+    const pageNum = parseInt(sanitize(page), 10);
+    const limitNum = parseInt(sanitize(limit), 10);
+    const startIndex = (pageNum - 1) * limitNum;
     
     // Build query
     const query = { user: req.user.id };
@@ -18,55 +32,61 @@ exports.getTasks = async (req, res) => {
     }
     
     if (priority) {
-      query.priority = priority;
+      query.priority = sanitize(priority);
     }
     
     // Build sort object
     let sortObj = {};
     if (sort) {
-      sortObj[sort] = sortDir === 'desc' ? -1 : 1;
+      sortObj[sanitize(sort)] = sortDir === 'desc' ? -1 : 1;
     } else {
       // Default sort by createdAt
       sortObj = { createdAt: -1 };
     }
     
-    // Execute query
-    const tasks = await Task.find(query).sort(sortObj);
+    // Count total documents for pagination
+    const total = await Task.countDocuments(query);
+    
+    // Execute query with pagination
+    const tasks = await Task.find(query)
+      .sort(sortObj)
+      .skip(startIndex)
+      .limit(limitNum);
+    
+    // Pagination result
+    const pagination = {
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum)
+    };
     
     res.status(200).json({
       success: true,
+      pagination,
       count: tasks.length,
       data: tasks
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      success: false,
-      message: 'Server Error'
-    });
+    next(err);
   }
 };
 
 // @desc    Get single task
 // @route   GET /api/tasks/:id
 // @access  Private
-exports.getTask = async (req, res) => {
+exports.getTask = async (req, res, next) => {
   try {
-    const task = await Task.findById(req.params.id);
+    const taskId = sanitize(req.params.id);
+    const task = await Task.findById(taskId);
     
     if (!task) {
-      return res.status(404).json({
-        success: false,
-        message: 'Task not found'
-      });
+      return next(new ErrorResponse('Task not found', 404));
     }
     
     // Check task ownership
     if (task.user.toString() !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to access this task'
-      });
+      return next(new ErrorResponse('Not authorized to access this task', 403));
     }
     
     res.status(200).json({
@@ -74,24 +94,14 @@ exports.getTask = async (req, res) => {
       data: task
     });
   } catch (err) {
-    console.error(err);
-    if (err.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid task ID'
-      });
-    }
-    res.status(500).json({
-      success: false,
-      message: 'Server Error'
-    });
+    next(err);
   }
 };
 
 // @desc    Create a task
 // @route   POST /api/tasks
 // @access  Private
-exports.createTask = async (req, res) => {
+exports.createTask = async (req, res, next) => {
   try {
     // Validation schema
     const schema = Joi.object({
@@ -105,34 +115,33 @@ exports.createTask = async (req, res) => {
     // Validate request body
     const { error } = schema.validate(req.body);
     if (error) {
-      return res.status(400).json({
-        success: false,
-        message: error.details[0].message
-      });
+      return next(new ErrorResponse(error.details[0].message, 400));
+    }
+    
+    // Sanitize inputs
+    const sanitizedBody = {};
+    for (const [key, value] of Object.entries(req.body)) {
+      sanitizedBody[key] = sanitize(value);
     }
     
     // Add user to request body
-    req.body.user = req.user.id;
+    sanitizedBody.user = req.user.id;
     
-    const task = await Task.create(req.body);
+    const task = await Task.create(sanitizedBody);
     
     res.status(201).json({
       success: true,
       data: task
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      success: false,
-      message: 'Server Error'
-    });
+    next(err);
   }
 };
 
 // @desc    Update a task
 // @route   PUT /api/tasks/:id
 // @access  Private
-exports.updateTask = async (req, res) => {
+exports.updateTask = async (req, res, next) => {
   try {
     // Validation schema
     const schema = Joi.object({
@@ -146,31 +155,29 @@ exports.updateTask = async (req, res) => {
     // Validate request body
     const { error } = schema.validate(req.body);
     if (error) {
-      return res.status(400).json({
-        success: false,
-        message: error.details[0].message
-      });
+      return next(new ErrorResponse(error.details[0].message, 400));
     }
     
-    let task = await Task.findById(req.params.id);
+    // Sanitize inputs
+    const taskId = sanitize(req.params.id);
+    const sanitizedBody = {};
+    for (const [key, value] of Object.entries(req.body)) {
+      sanitizedBody[key] = sanitize(value);
+    }
+    
+    let task = await Task.findById(taskId);
     
     if (!task) {
-      return res.status(404).json({
-        success: false,
-        message: 'Task not found'
-      });
+      return next(new ErrorResponse('Task not found', 404));
     }
     
     // Check task ownership
     if (task.user.toString() !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to update this task'
-      });
+      return next(new ErrorResponse('Not authorized to update this task', 403));
     }
     
     // Update task
-    task = await Task.findByIdAndUpdate(req.params.id, req.body, {
+    task = await Task.findByIdAndUpdate(taskId, sanitizedBody, {
       new: true,
       runValidators: true
     });
@@ -180,40 +187,25 @@ exports.updateTask = async (req, res) => {
       data: task
     });
   } catch (err) {
-    console.error(err);
-    if (err.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid task ID'
-      });
-    }
-    res.status(500).json({
-      success: false,
-      message: 'Server Error'
-    });
+    next(err);
   }
 };
 
 // @desc    Delete a task
 // @route   DELETE /api/tasks/:id
 // @access  Private
-exports.deleteTask = async (req, res) => {
+exports.deleteTask = async (req, res, next) => {
   try {
-    const task = await Task.findById(req.params.id);
+    const taskId = sanitize(req.params.id);
+    const task = await Task.findById(taskId);
     
     if (!task) {
-      return res.status(404).json({
-        success: false,
-        message: 'Task not found'
-      });
+      return next(new ErrorResponse('Task not found', 404));
     }
     
     // Check task ownership
     if (task.user.toString() !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to delete this task'
-      });
+      return next(new ErrorResponse('Not authorized to delete this task', 403));
     }
     
     await task.deleteOne();
@@ -223,16 +215,6 @@ exports.deleteTask = async (req, res) => {
       data: {}
     });
   } catch (err) {
-    console.error(err);
-    if (err.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid task ID'
-      });
-    }
-    res.status(500).json({
-      success: false,
-      message: 'Server Error'
-    });
+    next(err);
   }
 }; 
