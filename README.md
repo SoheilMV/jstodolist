@@ -5,7 +5,7 @@ A secure, production-ready RESTful API for managing todo tasks with user authent
 ![Node.js](https://img.shields.io/badge/Node.js-v18+-green.svg)
 ![Express](https://img.shields.io/badge/Express-v5.1.0-blue.svg)
 ![MongoDB](https://img.shields.io/badge/MongoDB-v5+-yellow.svg)
-![License](https://img.shields.io/badge/License-ISC-orange.svg)
+![License](https://img.shields.io/badge/License-MIT-orange.svg)
 
 ## Features
 
@@ -254,4 +254,4 @@ docker run -p 5000:5000 -d todolist-api
 
 ## 📄 License
 
-This project is licensed under the ISC License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details. 
